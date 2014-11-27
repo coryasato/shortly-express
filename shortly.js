@@ -5,6 +5,9 @@ var bodyParser = require('body-parser');
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
 var bcrypt = require('bcrypt-nodejs');
+var passport = require('passport');
+var githubStrategy = require('passport-github').Strategy;
+
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -30,6 +33,12 @@ app.use(session({
 }));
 app.use(express.static(__dirname + '/public'));
 
+/*****************************************/
+/**************** Passport ***************/
+/*****************************************/
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.get('/', isLoggedIn, function(req, res) {
   res.render('index');
@@ -130,7 +139,7 @@ app.post('/signup', function(req, res) {
         user.save().then(function(newUser) {
           Users.add(newUser);
           req.session.user = newUser;
-          res.redirect('/login');
+          res.redirect('/');
           res.send(200, newUser);
         });
       }
