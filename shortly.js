@@ -4,6 +4,7 @@ var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
+var bcrypt = require('bcrypt-nodejs');
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -24,31 +25,27 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
   secret: 'aviaviaviavi',
-  resave: true,
+  resave: false,
   saveUninitialized: true
 }));
 app.use(express.static(__dirname + '/public'));
 
 
-app.get('/',
-function(req, res) {
+app.get('/', isLoggedIn, function(req, res) {
   res.render('index');
 });
 
-app.get('/create',
-function(req, res) {
+app.get('/create', isLoggedIn, function(req, res) {
   res.render('index');
 });
 
-app.get('/links',
-function(req, res) {
+app.get('/links', isLoggedIn, function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
-app.post('/links',
-function(req, res) {
+app.post('/links', isLoggedIn, function(req, res) {
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
@@ -89,7 +86,26 @@ app.get('/login', function(req, res) {
   res.render('login');
 });
 
-app.post('./login', function(req, res) {
+app.post('/login', function(req, res) {
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({username: username}).fetch().then(function(user) {
+    if(!user) {
+      res.redirect('/login');
+    } else {
+      bcrypt.compare(password, user.get('password'), function(err, match) {
+        if(match) {
+          return req.session.regenerate(function() {
+            req.session.user = match;
+            res.redirect('/');
+          });
+        } else {
+          res.redirect('/login');
+        }
+      });
+    }
+  });
 
 });
 
@@ -101,10 +117,10 @@ app.post('/signup', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
 
-  new User({username: username, password:password}).fetch()
+  new User({username: username}).fetch()
     .then(function(found) {
       if(found) {
-        res.send(200, found.attributes);
+        res.redirect('/signup');
       } else {
         var user = new User({
           username: username,
@@ -114,11 +130,17 @@ app.post('/signup', function(req, res) {
         user.save().then(function(newUser) {
           Users.add(newUser);
           req.session.user = newUser;
-          res.redirect('/');
+          res.redirect('/login');
           res.send(200, newUser);
         });
       }
     });
+});
+
+app.get('/logout', function(req, res) {
+  req.session.destroy(function() {
+    res.redirect('/');
+  });
 });
 
 /************************************************************/
@@ -148,6 +170,14 @@ app.get('/*', function(req, res) {
     }
   });
 });
+
+// Middleware
+function isLoggedIn(req, res, next) {
+  if(req.session.user) {
+    return next();
+  }
+  res.redirect('/login');
+}
 
 console.log('Shortly is listening on 4568');
 app.listen(4568);
