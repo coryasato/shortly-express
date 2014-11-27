@@ -96,8 +96,8 @@ app.post('/login', function(req, res) {
     } else {
       bcrypt.compare(password, user.get('password'), function(err, match) {
         if(match) {
-          return req.session.regenerate(function() {
-            req.session.user = match;
+          req.session.regenerate(function() {
+            req.session.user = user;
             res.redirect('/');
           });
         } else {
@@ -138,7 +138,9 @@ app.post('/signup', function(req, res) {
 });
 
 app.get('/logout', function(req, res) {
-  req.session.destroy(function() {
+  console.log('logout hit');
+  req.session.destroy(function(err) {
+    if (err) { console.log('err'); }
     res.redirect('/');
   });
 });
